@@ -1,0 +1,43 @@
+[package]
+name = "share-me-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+
+[dependencies]
+axum = "0.8"
+axum-extra = { version = "0.12", features = ["typed-header"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "fs", "sync"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["limit", "trace", "request-id", "util", "cors", "sensitive-headers"] }
+tower_governor = "0.8"
+governor = "0.10"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "sqlite", "postgres", "migrate", "macros", "chrono"] }
+object_store = { version = "0.13", features = ["aws"] }
+figment = { version = "0.10", features = ["env", "test"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+futures-util = "0.3"
+tokio-util = { version = "0.7", features = ["io", "rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+thiserror = "2"
+anyhow = "1"
+sha2 = "0.10"
+subtle = "2"
+rand = "0.9"
+nanoid = "0.4"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+base64 = "0.22"
+hex = "0.4"
+
+[dev-dependencies]
+reqwest = { version = "0.13", features = ["stream", "json"] }
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["minio"] }
+aws-sdk-s3 = "1"
+aws-config = "1"

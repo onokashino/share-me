@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repo and on checkout everywhere.
+# These files are consumed inside Linux containers (Dockerfiles, shell snippets
+# in compose, YAML), so CRLF must never leak in — even on Windows checkouts.
+* text=auto eol=lf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.wasm binary

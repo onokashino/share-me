@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+build/
+target/
+
+# Env & secrets (.env.example stays tracked)
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs & debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Test / e2e artifacts
+_e2e*/
+*.e2e.db
+
+# Coverage
+coverage/
+
+# Self-host runtime data (local-disk backend)
+data/
+
+# Local design prototype (reference only — not part of the shipped app)
+/ex/
+
+# AI-assistant tooling & local agent notes (kept local, never published)
+.serena/
+memory-bank/
+.playwright-mcp/
+.claude/
+.cursor/
+.cursorrules
+.aider*
+.github/copilot-instructions.md
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+docs/superpowers/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+.idea/
+.vscode/

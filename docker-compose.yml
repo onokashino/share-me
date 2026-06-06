@@ -1,0 +1,74 @@
+name: share-me
+
+# share·me — default stack: Traefik fronts the Rust API and the Next.js web app
+# under a single origin. /api/* → api, everything else → web. Local-disk storage
+# (SQLite + blobs) persists on the `api-data` named volume.
+#
+#   docker compose up --build                 → HTTP, reach by IP / http://localhost
+#   set DOMAIN + ACME_EMAIL in .env, then up  → HTTPS with auto Let's Encrypt
+#
+# Routing is file-provider based (infra/traefik/render-traefik.sh renders it from
+# env) — no Docker socket required, so it works the same on Docker Desktop and on
+# Linux hosts.
+#
+# For S3/MinIO storage, add the override:
+#   docker compose -f docker-compose.yml -f docker-compose.s3.yml up --build
+
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    # render-traefik.sh builds the config from env at boot: DOMAIN empty → plain
+    # HTTP routed by path (reach by IP); DOMAIN set → HTTPS with an automatic
+    # Let's Encrypt cert + an http→https redirect. (the image ships sh + cat.)
+    entrypoint: ["sh", "/render-traefik.sh"]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./infra/traefik/render-traefik.sh:/render-traefik.sh:ro
+      - letsencrypt:/letsencrypt
+    depends_on:
+      - web
+      - api
+
+  api:
+    # Published by CI; `docker compose pull` uses it (no local build needed).
+    # `docker compose up --build` still builds + tags it locally instead.
+    image: ${API_IMAGE:-ghcr.io/onokashino/share-me-api:latest}
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+      STORAGE_BACKEND: local
+      RATE_LIMIT_PER_SEC: ${RATE_LIMIT_PER_SEC:-50}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-5368709120}
+    volumes:
+      - api-data:/app/data
+    expose:
+      - "8080"
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/onokashino/share-me-web:latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_TOR_URL: ${NEXT_PUBLIC_TOR_URL:-}
+        NEXT_PUBLIC_SOURCE_URL: ${NEXT_PUBLIC_SOURCE_URL:-}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:8080
+    expose:
+      - "3000"
+    depends_on:
+      - api
+
+volumes:
+  api-data:
+  letsencrypt:

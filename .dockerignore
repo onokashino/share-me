@@ -1,0 +1,42 @@
+# VCS
+.git
+.gitignore
+
+# Node / build outputs (recreated inside the image).
+# Bare + **/ forms so the root-level dirs are matched too (the host is Windows,
+# so a copied node_modules would carry the wrong-platform binaries).
+node_modules
+**/node_modules
+.next
+**/.next
+out
+**/out
+dist
+**/dist
+build
+**/build
+target
+**/target
+
+# Docs / design / tooling (not needed in the image)
+docs
+ex
+.serena
+memory-bank
+.playwright-mcp
+
+# Local env & runtime data
+.env
+.env.local
+.env.*.local
+data
+**/data
+_e2e*
+
+# Logs
+*.log
+
+# Docker / compose
+**/Dockerfile
+.dockerignore
+docker-compose*.yml

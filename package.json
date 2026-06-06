@@ -1,0 +1,12 @@
+{
+  "name": "share-me",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onokashino/share-me.git"
+  },
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=20" }
+}

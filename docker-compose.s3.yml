@@ -1,0 +1,50 @@
+name: share-me
+
+# S3 storage override (MinIO). Use together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.s3.yml up --build
+#
+# Points the API at a MinIO bucket instead of local disk. For a real S3 bucket,
+# drop the minio/createbucket services and set S3_ENDPOINT/region + credentials
+# in .env to your provider.
+
+services:
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-shareme}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-shareme-secret}
+    volumes:
+      - minio-data:/data
+    expose:
+      - "9000"
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  # one-shot: wait for MinIO, create the bucket, exit
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-shareme} ${S3_SECRET_KEY:-shareme-secret}; do sleep 1; done;
+      mc mb -p local/${S3_BUCKET:-share-me};
+      exit 0;
+      "
+
+  api:
+    environment:
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-share-me}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-shareme}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-shareme-secret}
+    depends_on:
+      - minio
+      - createbucket
+
+volumes:
+  minio-data:

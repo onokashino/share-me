@@ -1,0 +1,11 @@
+# Rust build artifacts (rebuilt in the image)
+target
+
+# Local runtime data / databases
+data
+*.db
+*.db-*
+
+# Docker
+Dockerfile
+.dockerignore

@@ -1,0 +1,365 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./components.css";
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   Design tokens — copied from ex/styles.css :root dark theme
+   ============================================================ */
+
+:root {
+  /* dark-theme colours (this app is dark-only at this stage) */
+  --bg: oklch(0.165 0.012 250);
+  --bg-2: oklch(0.205 0.014 252);
+  --panel: oklch(0.225 0.015 253);
+  --panel-2: oklch(0.26 0.016 254);
+  --line: oklch(0.34 0.014 254);
+  --line-soft: oklch(0.3 0.012 254 / 0.6);
+  --text: oklch(0.97 0.005 250);
+  --text-2: oklch(0.78 0.012 252);
+  --text-3: oklch(0.6 0.012 252);
+
+  /* brand accent: orange (#ff7a29) — distinct from shadcn's gray --accent hover token */
+  --brand: #ff7a29;
+  --brand-ink: #2a1100;
+  --glow: rgba(255, 122, 41, 0.20);
+
+  --danger: oklch(0.68 0.2 25);
+  --amber: oklch(0.82 0.13 76);
+
+  --radius: 28px;
+
+  /* easing, typography, shadow — used by component CSS */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-display: var(--font-space-grotesk), var(--font-manrope-cyr), 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), var(--font-jbm-cyr), 'JetBrains Mono', ui-monospace, monospace;
+  --shadow: 0 30px 80px -30px rgba(0,0,0,0.7), 0 8px 24px -12px rgba(0,0,0,0.6);
+
+  color-scheme: dark;
+
+  --background: oklch(1 0 0);
+
+  --foreground: oklch(0.145 0 0);
+
+  --card: oklch(1 0 0);
+
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+
+  --popover-foreground: oklch(0.145 0 0);
+
+  --primary: oklch(0.205 0 0);
+
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.97 0 0);
+
+  --secondary-foreground: oklch(0.205 0 0);
+
+  --muted: oklch(0.97 0 0);
+
+  --muted-foreground: oklch(0.556 0 0);
+
+  --accent-foreground: #2a1100;
+
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --border: oklch(0.922 0 0);
+
+  --input: oklch(0.922 0 0);
+
+  --ring: oklch(0.708 0 0);
+
+  --chart-1: oklch(0.87 0 0);
+
+  --chart-2: oklch(0.556 0 0);
+
+  --chart-3: oklch(0.439 0 0);
+
+  --chart-4: oklch(0.371 0 0);
+
+  --chart-5: oklch(0.269 0 0);
+
+  --sidebar: oklch(0.985 0 0);
+
+  --sidebar-foreground: oklch(0.145 0 0);
+
+  --sidebar-primary: oklch(0.205 0 0);
+
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+
+  --sidebar-accent: oklch(0.97 0 0);
+
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+
+  --sidebar-border: oklch(0.922 0 0);
+
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* ============================================================
+   @theme inline — bridge CSS vars to Tailwind v4 utilities
+   ============================================================ */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-danger: var(--danger);
+  --color-amber: var(--amber);
+
+  --font-display: var(--font-space-grotesk), var(--font-manrope-cyr), "Space Grotesk", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), var(--font-jbm-cyr), "JetBrains Mono", ui-monospace, monospace;
+
+  /* radius scale */
+  --radius-xl: var(--radius);               /* 28px */
+  --radius-lg: calc(var(--radius) - 11px);  /* 17px */
+  --radius-md: calc(var(--radius) - 18px);  /* 10px */
+  --radius-pill: 9999px;
+  --font-heading: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif;
+  --font-sans: var(--font-space-grotesk), var(--font-manrope-cyr), "Space Grotesk", system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ============================================================
+   @theme — motion tokens (keyframes + animation utilities)
+   ============================================================ */
+
+@theme {
+  --animate-spin-cw: spin-cw 18s linear infinite;
+  --animate-spin-ccw: spin-ccw 24s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
+  --animate-slide-up: slide-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes spin-cw {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes spin-ccw {
+    to { transform: rotate(-360deg); }
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.92); opacity: 0.7; }
+    70%  { transform: scale(1.15); opacity: 0; }
+    100% { opacity: 0; }
+  }
+  @keyframes slide-up {
+    from { transform: translateY(16px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+}
+
+/* ============================================================
+   Base resets
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   Atmospheric background — ported verbatim from ex/styles.css
+   ============================================================ */
+
+/* bg-field: faint grid + film grain + accent aurora */
+.bg-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-field::before {
+  /* soft accent aurora */
+  content: "";
+  position: absolute;
+  top: -25%;
+  left: 50%;
+  width: 80vw;
+  height: 70vh;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, var(--glow), transparent 65%);
+  filter: blur(20px);
+}
+
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  /* Hexagonal honeycomb mesh. A flat neutral-grey fill that a seamless hex-outline
+     SVG masks into a wireframe, intersected with the soft radial fade so the mesh
+     dissolves toward the edges. Kept dark + low-opacity to blend into the page. */
+  background-color: oklch(0.3 0 0);
+  --hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='69.282' viewBox='0 0 120 69.282'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1' d='M40 0L20 34.641 -20 34.641 -40 0 -20 -34.641 20 -34.641Z M40 69.282L20 103.923 -20 103.923 -40 69.282 -20 34.641 20 34.641Z M160 0L140 34.641 100 34.641 80 0 100 -34.641 140 -34.641Z M160 69.282L140 103.923 100 103.923 80 69.282 100 34.641 140 34.641Z M100 34.641L80 69.282 40 69.282 20 34.641 40 0 80 0Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--hex), radial-gradient(ellipse 80% 70% at 50% 30%, black, transparent 75%);
+  mask-image: var(--hex), radial-gradient(ellipse 80% 70% at 50% 30%, black, transparent 75%);
+  -webkit-mask-size: 120px 69.28px, cover;
+  mask-size: 120px 69.28px, cover;
+  -webkit-mask-repeat: repeat, no-repeat;
+  mask-repeat: repeat, no-repeat;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  opacity: 0.4;
+}
+
+/* film grain */
+.bg-grain {
+  position: absolute;
+  inset: -50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  mix-blend-mode: overlay;
+}
+
+.no-grain .bg-grain { display: none; }
+
+/* content layer sits above bg-field */
+.app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   Reduced-motion overrides
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-orbit,
+  .ring-orbit--reverse,
+  [class*="animate-"] {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   Scrollbars — ported from ex/styles.css
+   ============================================================ */
+
+:root {
+  --sb-thumb: oklch(0.72 0.17 52 / 0.55);
+  --sb-thumb-hover: var(--brand);
+  --sb-track: oklch(0.26 0.016 254 / 0.4);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) var(--sb-track);
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: var(--sb-track); }
+::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-hover);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:active { background: var(--brand); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
