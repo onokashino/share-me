@@ -27,7 +27,7 @@ anyhow = "1"
 sha2 = "0.10"
 subtle = "2"
 rand = "0.9"
-nanoid = "0.4"
+nanoid = "0.5"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 base64 = "0.22"
 hex = "0.4"
