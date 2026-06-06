@@ -24,7 +24,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 thiserror = "2"
 anyhow = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 subtle = "2"
 rand = "0.9"
 nanoid = "0.4"
