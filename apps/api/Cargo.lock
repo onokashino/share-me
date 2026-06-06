@@ -3566,7 +3566,7 @@ dependencies = [
  "http-body-util",
  "nanoid",
  "object_store",
- "rand 0.9.4",
+ "rand 0.10.1",
  "reqwest 0.13.4",
  "serde",
  "serde_json",

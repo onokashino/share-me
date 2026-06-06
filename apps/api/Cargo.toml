@@ -26,7 +26,7 @@ thiserror = "2"
 anyhow = "1"
 sha2 = "0.10"
 subtle = "2"
-rand = "0.9"
+rand = "0.10"
 nanoid = "0.4"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 base64 = "0.22"
