@@ -51,6 +51,10 @@ services:
       - api-data:/app/data
     expose:
       - "8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   web:
     image: ${WEB_IMAGE:-ghcr.io/onokashino/share-me-web:latest}
@@ -68,6 +72,10 @@ services:
       - "3000"
     depends_on:
       - api
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   api-data:

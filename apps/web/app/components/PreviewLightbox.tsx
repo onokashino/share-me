@@ -33,7 +33,13 @@ export function PreviewLightbox({ file, onClose, onSave }: PreviewLightboxProps)
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const u = URL.createObjectURL(file.blob);
+    // Non-image previews render in an <iframe>; force application/pdf so a file
+    // that lies about its type (e.g. "x.pdf" carrying text/html) can never be
+    // interpreted as HTML in our origin. Defense-in-depth on top of the CSP.
+    const safeBlob = isImage(file.type)
+      ? file.blob
+      : new Blob([file.blob], { type: 'application/pdf' });
+    const u = URL.createObjectURL(safeBlob);
     setUrl(u);
 
     const onKey = (e: KeyboardEvent) => {

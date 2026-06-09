@@ -26,7 +26,7 @@ function sanitizeUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
-      return url;
+      return parsed.href;
     }
     return null;
   } catch {

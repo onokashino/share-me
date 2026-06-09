@@ -19,6 +19,10 @@ export function proxy(request: NextRequest) {
     "style-src-attr 'unsafe-inline'",
     "font-src 'self'",
     "img-src 'self' blob: data:",
+    // The PDF preview renders a same-origin blob: URL in an <iframe> (the blob
+    // is force-typed application/pdf, so it can't be interpreted as HTML).
+    // 'self' does NOT cover the blob: scheme for frames, so it must be explicit.
+    "frame-src 'self' blob:",
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",

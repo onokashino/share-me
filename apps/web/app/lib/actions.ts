@@ -14,6 +14,14 @@ import { cookies } from 'next/headers';
 
 const API = process.env.API_INTERNAL_URL ?? 'http://api:8080';
 
+// Public ids are url-safe nanoids. Reject anything else so a client-supplied id
+// can't alter the request path or target host (SSRF / path-injection guard).
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function safeId(id: string): string {
+  if (!ID_RE.test(id)) throw new Error('invalid id');
+  return id;
+}
+
 // ---------------------------------------------------------------------------
 // createUpload
 // ---------------------------------------------------------------------------
@@ -69,10 +77,11 @@ export async function getStatus(
   | { error: 'not-found' }
   | Record<string, unknown>
 > {
-  const owner = (await cookies()).get(`owner_${id}`)?.value;
+  const sid = safeId(id);
+  const owner = (await cookies()).get(`owner_${sid}`)?.value;
   if (!owner) return { error: 'no-owner' };
 
-  const res = await fetch(`${API}/api/v1/uploads/${id}/status`, {
+  const res = await fetch(`${API}/api/v1/uploads/${sid}/status`, {
     cache: 'no-store',
     headers: { authorization: `Bearer ${owner}` },
   });
@@ -90,11 +99,12 @@ export async function getStatus(
 export async function revokeUpload(
   id: string,
 ): Promise<{ ok: true } | { error: 'no-owner' }> {
+  const sid = safeId(id);
   const jar = await cookies();
-  const owner = jar.get(`owner_${id}`)?.value;
+  const owner = jar.get(`owner_${sid}`)?.value;
   if (!owner) return { error: 'no-owner' };
 
-  const res = await fetch(`${API}/api/v1/uploads/${id}`, {
+  const res = await fetch(`${API}/api/v1/uploads/${sid}`, {
     method: 'DELETE',
     cache: 'no-store',
     headers: { authorization: `Bearer ${owner}` },
@@ -105,7 +115,7 @@ export async function revokeUpload(
     throw new Error(`revokeUpload failed: HTTP ${res.status}`);
   }
 
-  jar.delete(`owner_${id}`);
+  jar.delete(`owner_${sid}`);
   return { ok: true };
 }
 
@@ -126,7 +136,8 @@ export async function getMeta(
       unlock_at: string | null;
     }
 > {
-  const res = await fetch(`${API}/api/v1/dl/${id}/meta`, {
+  const sid = safeId(id);
+  const res = await fetch(`${API}/api/v1/dl/${sid}/meta`, {
     cache: 'no-store',
   });
 
@@ -143,7 +154,8 @@ export async function getMeta(
 export async function getHeaderBytes(
   id: string,
 ): Promise<{ headerB64: string } | { error: 'gone' }> {
-  const res = await fetch(`${API}/api/v1/dl/${id}`, {
+  const sid = safeId(id);
+  const res = await fetch(`${API}/api/v1/dl/${sid}`, {
     cache: 'no-store',
   });
 

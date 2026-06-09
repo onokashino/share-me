@@ -6,6 +6,9 @@ const dev = process.env.NODE_ENV === 'development';
 const nextConfig: NextConfig = {
   transpilePackages: ['@share-me/crypto'],
 
+  // Don't advertise the framework in an X-Powered-By header.
+  poweredByHeader: false,
+
   // Standalone server bundle for Docker. Trace from the monorepo root so the
   // @share-me/crypto workspace package and hoisted deps are included.
   output: 'standalone',
@@ -30,6 +33,10 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Frame-Options', value: 'DENY' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
+          },
         ],
       },
     ];

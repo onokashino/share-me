@@ -433,15 +433,22 @@ export async function openDrop(opts: OpenDropOpts): Promise<OpenDropResult> {
   let kp: Uint8Array | undefined;
   if (parsed.kdfType === KdfType.Argon2id) {
     if (!opts.password) return { needsPassword: true };
-    kp = await deriveArgon2(opts.password, parsed.salt, {
-      m: new DataView(parsed.params.buffer, parsed.params.byteOffset).getUint32(0, false),
-      t: new DataView(parsed.params.buffer, parsed.params.byteOffset).getUint32(4, false),
-      pp: new DataView(parsed.params.buffer, parsed.params.byteOffset).getUint32(8, false),
-    });
+    if (parsed.params.length < 12) throw new Error('malformed argon2id params');
+    const dv = new DataView(parsed.params.buffer, parsed.params.byteOffset, parsed.params.length);
+    const m = dv.getUint32(0, false);
+    const t = dv.getUint32(4, false);
+    const pp = dv.getUint32(8, false);
+    // Bound KDF cost read from the untrusted header (matches @share-me/crypto).
+    if (m < 1 || m > 1_048_576 || t < 1 || t > 64 || pp < 1 || pp > 16) {
+      throw new Error('argon2id params out of range');
+    }
+    kp = await deriveArgon2(opts.password, parsed.salt, { m, t, pp });
   } else if (parsed.kdfType === KdfType.Pbkdf2) {
     if (!opts.password) return { needsPassword: true };
+    if (parsed.params.length < 4) throw new Error('malformed pbkdf2 params');
     const { pbkdf2: derivePbkdf2 } = await import('@share-me/crypto');
-    const iters = new DataView(parsed.params.buffer, parsed.params.byteOffset).getUint32(0, false);
+    const iters = new DataView(parsed.params.buffer, parsed.params.byteOffset, parsed.params.length).getUint32(0, false);
+    if (iters < 1 || iters > 20_000_000) throw new Error('pbkdf2 iterations out of range');
     kp = await derivePbkdf2(opts.password, parsed.salt, iters);
   }
 

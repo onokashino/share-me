@@ -21,5 +21,10 @@ COPY --from=builder /build/target/release/share-me-api /usr/local/bin/share-me-a
 ENV STORAGE_LOCAL_PATH=data/blobs \
     DATABASE_URL=sqlite://data/share-me.db
 
+# Run unprivileged. /app/data must be writable by this user; a fresh named
+# volume mounted there inherits the directory's ownership from the image.
+RUN useradd -r -u 10001 app && mkdir -p /app/data && chown -R app:app /app
+USER app
+
 EXPOSE 8080
 CMD ["share-me-api"]

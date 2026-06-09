@@ -8,6 +8,14 @@ import { importAesKey } from './aead';
 import { decryptFromBytes, encryptToBytes, segmentCountFor } from './stream';
 import { computeDownloadAuth, type DownloadAuth } from './auth';
 
+// Upper bounds on KDF cost parameters read from the (untrusted) header. Reject
+// absurd values before invoking the KDF so a hostile server cannot make the
+// client allocate gigabytes / hang. Generous — well above any legit setting.
+const MAX_PBKDF2_ITERS = 20_000_000;
+const MAX_ARGON2_MEM_KIB = 1_048_576; // 1 GiB
+const MAX_ARGON2_TIME = 64;
+const MAX_ARGON2_LANES = 16;
+
 /** Argon2id derivation function type — injected by the caller (e.g. apps/web provides a worker-based implementation). */
 export type DeriveArgon2Fn = (
   password: string,
@@ -112,14 +120,21 @@ export async function decryptFile(input: DecryptInput): Promise<DecryptOutput> {
   let kp: Uint8Array | undefined;
   if (parsed.kdfType === KdfType.Pbkdf2) {
     if (input.password === undefined) throw new Error('this file requires a password');
+    if (parsed.params.length < 4) throw new Error('malformed pbkdf2 params');
     const iters = readU32be(parsed.params, 0);
+    if (iters < 1 || iters > MAX_PBKDF2_ITERS) throw new Error('pbkdf2 iterations out of range');
     kp = await pbkdf2(input.password, parsed.salt, iters);
   } else if (parsed.kdfType === KdfType.Argon2id) {
     if (input.password === undefined) throw new Error('this file requires a password');
     if (!input.deriveArgon2) throw new Error('argon2id derive function not provided');
+    if (parsed.params.length < 12) throw new Error('malformed argon2id params');
     const m = readU32be(parsed.params, 0);
     const t = readU32be(parsed.params, 4);
     const pp = readU32be(parsed.params, 8);
+    // Bound KDF cost read from the untrusted header before invoking it.
+    if (m < 1 || m > MAX_ARGON2_MEM_KIB || t < 1 || t > MAX_ARGON2_TIME || pp < 1 || pp > MAX_ARGON2_LANES) {
+      throw new Error('argon2id params out of range');
+    }
     kp = await input.deriveArgon2(input.password, parsed.salt, { m, t, pp });
   } else {
     // KdfType.None

@@ -1,8 +1,11 @@
-import { SEG_AAD_TAG, TAG_LEN } from './constants';
+import { MAX_SEGMENT_COUNT, SEG_AAD_TAG, TAG_LEN } from './constants';
 import { concatBytes, u32be } from './bytes';
 import { gcmDecrypt, gcmEncrypt } from './aead';
 
 export function segmentNonce(prefix: Uint8Array, counter: number, isFinal: boolean): Uint8Array {
+  if (counter < 0 || counter > MAX_SEGMENT_COUNT) {
+    throw new Error('segment counter exceeds the 32-bit limit');
+  }
   return concatBytes(prefix, u32be(counter), new Uint8Array([isFinal ? 1 : 0]));
 }
 
@@ -47,6 +50,11 @@ export async function encryptToBytes(
   segmentSize: number,
 ): Promise<Uint8Array> {
   const n = segmentCountFor(plaintext.length, segmentSize);
+  // Fail fast before doing any work if this plaintext+segmentSize would overflow
+  // the 32-bit segment counter (segment indices are 0..n-1).
+  if (n - 1 > MAX_SEGMENT_COUNT) {
+    throw new Error('plaintext requires too many segments for the 32-bit counter');
+  }
   const parts: Uint8Array[] = [];
   for (let i = 0; i < n; i++) {
     const start = i * segmentSize;

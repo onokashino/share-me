@@ -50,6 +50,7 @@ http:
       rule: "Host(\`${DOMAIN}\`) && PathPrefix(\`/api\`)"
       entryPoints: [websecure]
       service: api
+      middlewares: [security-headers]
       priority: 100
       tls:
         certResolver: le
@@ -57,9 +58,16 @@ http:
       rule: "Host(\`${DOMAIN}\`)"
       entryPoints: [websecure]
       service: web
+      middlewares: [security-headers]
       priority: 1
       tls:
         certResolver: le
+  middlewares:
+    security-headers:
+      headers:
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
   services:
     api:
       loadBalancer:

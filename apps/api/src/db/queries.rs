@@ -118,6 +118,24 @@ impl Db {
         Ok(())
     }
 
+    /// Atomically consume the single-use upload token (sets it NULL) and return
+    /// the storage_key. Returns None if it was already consumed (a concurrent
+    /// PUT won the race) — makes the blob PUT strictly single-use with no
+    /// check-then-act window.
+    pub async fn consume_upload_token(&self, id: &str) -> anyhow::Result<Option<String>> {
+        let row: Option<(String,)> = match self {
+            Db::Sqlite(p) => sqlx::query_as(
+                "UPDATE uploads SET upload_token_hash = NULL \
+                 WHERE id = ?1 AND upload_token_hash IS NOT NULL RETURNING storage_key")
+                .bind(id).fetch_optional(p).await?,
+            Db::Postgres(p) => sqlx::query_as(
+                "UPDATE uploads SET upload_token_hash = NULL \
+                 WHERE id = $1 AND upload_token_hash IS NOT NULL RETURNING storage_key")
+                .bind(id).fetch_optional(p).await?,
+        };
+        Ok(row.map(|(k,)| k))
+    }
+
     /// Atomic claim-or-resume. Returns the storage info to stream, or Gone.
     pub async fn claim_or_resume(
         &self,
@@ -216,6 +234,7 @@ async fn claim_sqlite(p: &sqlx::Pool<sqlx::Sqlite>, id: &str, session: &str, now
         "SELECT storage_key, size_cipher FROM uploads WHERE id = ?1 AND has_blob = 1 \
          AND (expires_at IS NULL OR expires_at > ?2) \
          AND (unlock_at IS NULL OR unlock_at <= ?2) \
+         AND (max_downloads IS NULL OR max_downloads > 1) \
          AND id IN (SELECT upload_id FROM download_claims WHERE upload_id = ?1 AND session_id = ?3)")
         .bind(id).bind(now).bind(session).fetch_optional(&mut *tx).await?;
     if let Some((storage_key, size_cipher)) = existing {
@@ -253,6 +272,7 @@ async fn claim_postgres(p: &sqlx::Pool<sqlx::Postgres>, id: &str, session: &str,
         "SELECT storage_key, size_cipher FROM uploads WHERE id = $1 AND has_blob = TRUE \
          AND (expires_at IS NULL OR expires_at > $2) \
          AND (unlock_at IS NULL OR unlock_at <= $2) \
+         AND (max_downloads IS NULL OR max_downloads > 1) \
          AND EXISTS (SELECT 1 FROM download_claims WHERE upload_id = $1 AND session_id = $3)")
         .bind(id).bind(now).bind(session).fetch_optional(&mut *tx).await?;
     if let Some((storage_key, size_cipher)) = existing {

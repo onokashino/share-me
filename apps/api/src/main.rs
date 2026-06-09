@@ -7,7 +7,7 @@ use share_me_api::{
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tower_governor::{governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer};
+use tower_governor::{governor::GovernorConfigBuilder, key_extractor::PeerIpKeyExtractor, GovernorLayer};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,11 +33,16 @@ async fn main() -> anyhow::Result<()> {
     // into_make_service_with_connect_info), so we apply it here in main.rs
     // rather than inside build_router — that way the oneshot Router tests
     // remain unaffected.
+    // Key the limiter on the real socket peer IP (ConnectInfo), NOT on
+    // X-Forwarded-For. A client-supplied forwarding header would otherwise let
+    // an attacker spoof a fresh key per request and bypass the limit entirely.
+    // When run behind a trusted proxy that sanitises forwarding headers, an
+    // operator can front this with header-based extraction deliberately.
     let governor_conf = Arc::new(
         GovernorConfigBuilder::default()
             .per_second(cfg.rate_limit_per_sec as u64)
             .burst_size(cfg.rate_limit_burst)
-            .key_extractor(SmartIpKeyExtractor)
+            .key_extractor(PeerIpKeyExtractor)
             .finish()
             .unwrap(),
     );

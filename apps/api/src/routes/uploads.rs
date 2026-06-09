@@ -62,7 +62,27 @@ pub async fn create(
         .clamp(1, st.cfg.max_expiry_secs);
     let expires_at = Some(now + Duration::seconds(ttl));
 
-    let unlock_at = req.unlock_in_secs.map(|s| now + Duration::seconds(s));
+    let unlock_at = match req.unlock_in_secs {
+        None => None,
+        Some(s) => {
+            if s < 0 {
+                return Err(AppError::BadRequest("unlock_in_secs must be >= 0".into()));
+            }
+            let d = Duration::try_seconds(s)
+                .ok_or_else(|| AppError::BadRequest("unlock_in_secs out of range".into()))?;
+            let unlock = now
+                .checked_add_signed(d)
+                .ok_or_else(|| AppError::BadRequest("unlock_in_secs out of range".into()))?;
+            if let Some(exp) = expires_at {
+                if unlock >= exp {
+                    return Err(AppError::BadRequest(
+                        "unlock_in_secs must be before expiry".into(),
+                    ));
+                }
+            }
+            Some(unlock)
+        }
+    };
 
     let id = tokens::new_id();
     let owner_token = tokens::gen_token();
@@ -119,12 +139,14 @@ pub async fn put_blob(
         return Err(AppError::Unauthorized);
     }
 
-    let storage_key = format!("blobs/{id}");
+    // Atomically consume the single-use upload token BEFORE streaming so two
+    // concurrent PUTs cannot both pass the check and both write the same key.
+    let storage_key = st.db.consume_upload_token(&id).await?.ok_or(AppError::Gone)?;
     let written = st
         .blob
         .put_stream(&storage_key, body)
         .await
-        .map_err(|e| AppError::Other(e))?;
+        .map_err(AppError::Other)?;
     st.db.mark_blob_written(&id, written as i64).await?;
 
     Ok(StatusCode::NO_CONTENT)

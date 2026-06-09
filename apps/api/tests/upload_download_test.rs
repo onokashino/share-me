@@ -163,14 +163,15 @@ async fn upload_then_download_roundtrip() {
     assert_eq!(got.as_ref(), payload.as_slice(), "returned bytes must match uploaded payload");
 }
 
-/// max_downloads=1: first session → 200; same session again → 200 (resume); different session → 410.
+/// max_downloads=1 (burn-after-read): first request → 200; ANY second request,
+/// even from the same session, → 410. Strictly one-time, no resume.
 #[tokio::test]
-async fn burn_after_read_blocks_second_session_but_allows_resume() {
+async fn burn_after_read_is_strictly_one_time() {
     let (base, _guard) = common::spawn_server().await;
     let client = reqwest::Client::new();
     let id = common::create_and_upload(&base, &client, Some(1), b"data", "tok").await;
 
-    // First session claims
+    // First session claims the single slot.
     let a = client
         .get(format!("{base}/api/v1/dl/{id}/blob"))
         .bearer_auth("tok")
@@ -178,9 +179,9 @@ async fn burn_after_read_blocks_second_session_but_allows_resume() {
         .send()
         .await
         .unwrap();
-    assert_eq!(a.status(), 200, "first session must return 200");
+    assert_eq!(a.status(), 200, "first claim must return 200");
 
-    // Same session resumes → 200
+    // Same session again → 410: a burn drop cannot be re-downloaded.
     let b = client
         .get(format!("{base}/api/v1/dl/{id}/blob"))
         .bearer_auth("tok")
@@ -188,9 +189,9 @@ async fn burn_after_read_blocks_second_session_but_allows_resume() {
         .send()
         .await
         .unwrap();
-    assert_eq!(b.status(), 200, "same session resume must return 200");
+    assert_eq!(b.status(), 410, "same-session re-download of a burn drop must return 410");
 
-    // Different session → 410 (slot exhausted)
+    // Different session → 410.
     let c = client
         .get(format!("{base}/api/v1/dl/{id}/blob"))
         .bearer_auth("tok")
@@ -198,7 +199,28 @@ async fn burn_after_read_blocks_second_session_but_allows_resume() {
         .send()
         .await
         .unwrap();
-    assert_eq!(c.status(), 410, "different session after exhaustion must return 410");
+    assert_eq!(c.status(), 410, "different session after burn must return 410");
+}
+
+/// max_downloads=2: the same session may resume (re-stream) without burning a
+/// second slot; distinct sessions each consume a slot until exhausted.
+#[tokio::test]
+async fn multi_download_allows_same_session_resume() {
+    let (base, _guard) = common::spawn_server().await;
+    let client = reqwest::Client::new();
+    let id = common::create_and_upload(&base, &client, Some(2), b"data", "tok").await;
+    let get = |session: &'static str| {
+        client
+            .get(format!("{base}/api/v1/dl/{id}/blob"))
+            .bearer_auth("tok")
+            .header("x-download-session", session)
+            .send()
+    };
+
+    assert_eq!(get("sess").await.unwrap().status(), 200, "first claim → 200");
+    assert_eq!(get("sess").await.unwrap().status(), 200, "same-session resume → 200");
+    assert_eq!(get("other").await.unwrap().status(), 200, "second session consumes the remaining slot → 200");
+    assert_eq!(get("third").await.unwrap().status(), 410, "third session after exhaustion → 410");
 }
 
 /// Wrong bearer token on the blob endpoint → 401.
