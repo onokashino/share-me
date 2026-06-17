@@ -1,0 +1,60 @@
+name: Publish CLI
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 1.2.3), without the leading v'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm (OIDC trusted publishing needs npm >= 11.5.1)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve version from tag or input
+        id: ver
+        run: |
+          REF="${{ github.event.inputs.version || github.ref_name }}"
+          VER="${REF#v}"
+          if ! printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VER' is not a valid semver version (tag must look like v1.2.3)"
+            exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $VER"
+
+      - name: Set package version
+        run: npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version --workspace @onokashino/share-me-cli
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @onokashino/share-me-cli
+
+      - name: Test
+        run: npm test --workspace @onokashino/share-me-cli
+
+      - name: Build bundle
+        run: npm run build --workspace @onokashino/share-me-cli
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public --workspace @onokashino/share-me-cli

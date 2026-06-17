@@ -13,6 +13,7 @@ export {
   segmentAad,
 } from './stream';
 export { computeDownloadAuth, type DownloadAuth } from './auth';
+export { encodeBundle, decodeBundle, type BundleEntry, type BundleManifest } from './bundle';
 export {
   encryptFile,
   decryptFile,

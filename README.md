@@ -13,6 +13,7 @@ Self-hostable, end-to-end-encrypted file & text sharing — a privacy-first drop
 - **My links** — device-local history with live status, copy, revoke, and remove.
 - **Polished UX** — i18n (EN / RU / 繁), onboarding tour, fully responsive, strict per-request nonce CSP, **zero external requests** (Tor-ready).
 - **Storage** — local disk **or** any S3-compatible backend (MinIO, AWS S3, …).
+- **CLI** — a `share-me` / `shm` console client with the same end-to-end crypto: send files, folders (auto-zipped), or text; presets; EN / RU / 繁. See [Command-line client](#command-line-client).
 
 ## Architecture
 
@@ -82,6 +83,91 @@ docker compose -f docker-compose.yml -f docker-compose.s3.yml up --build
 ```
 
 Adds a MinIO service, creates the bucket, and points the API at it (`STORAGE_BACKEND=s3`). For a managed S3 bucket, set `S3_*` and `S3_ENDPOINT`/region in `.env` and drop the `minio`/`createbucket` services.
+
+## Command-line client
+
+`share-me` (short alias `shm`) is a console client that performs the **same end-to-end encryption as the web app** by reusing `@share-me/crypto`, so the server still only ever sees ciphertext. It lives in `packages/cli`.
+
+### Install
+
+From npm (no clone needed):
+
+```bash
+npm install -g @onokashino/share-me-cli   # installs `share-me` + `shm`
+# or run once without installing:
+npx @onokashino/share-me-cli up ./report.pdf
+```
+
+From source (for development):
+
+```bash
+npm install                                    # root install (workspaces)
+npm run build -w @onokashino/share-me-cli      # bundles packages/cli/dist/cli.cjs
+( cd packages/cli && npm link )                # puts `share-me` + `shm` on your PATH
+```
+
+Prefer not to link? Run it directly: `node packages/cli/dist/cli.cjs …`. First, point it at an instance (yours or the demo) — the first server you add becomes the default:
+
+```bash
+shm servers add demo https://share-me.onokami.space
+```
+
+### Send & receive
+
+```bash
+shm up ./report.pdf             # encrypt + upload a file → prints a share link
+shm up ./folder                 # a folder is zipped into an archive first
+shm up --text "secret note"     # share text
+shm down "<share link>"         # text is shown; a file prompts for a save name
+```
+
+Run `shm` with no arguments for an interactive menu (send / receive / servers / presets / language).
+
+### Settings & presets
+
+Choose interactively, pick a preset, or set flags directly (flags override the preset):
+
+| Flag | Meaning |
+|---|---|
+| `-e, --expires <dur>` | lifetime: `1h`, `7d`, `2w`, … |
+| `-m, --max-downloads <n>` | download limit (`0` = unlimited) |
+| `--burn` | burn after reading (1 download) |
+| `--unlock <dur>` | time-lock: not downloadable until `now + dur` |
+| `-p, --password` | password-protect (prompted, or `SHARE_ME_PASSWORD`) |
+| `-P, --preset <name>` | use a preset |
+| `--zip` | archive a folder without asking |
+| `-y, --yes` | skip interactive prompts |
+
+Built-in presets: `default` (7d, unlimited), `oneshot` (1d, 1 download), `burn` (7d, 1), `long` (30d, unlimited), `temp` (1h, 1). Save your own with `shm presets` (or `presets add | list | default | rm`).
+
+```bash
+shm up file.zip -P oneshot
+shm up notes.md -e 2d --burn
+```
+
+### Scripting
+
+```bash
+shm down "<link>" --print > out.txt           # text straight to stdout
+shm down "<link>" --out ./got.pdf             # save to an exact path, no prompts
+SHARE_ME_PASSWORD=hunter2 shm up secret.zip -p -P oneshot
+```
+
+Non-TTY runs go non-interactive automatically: text is printed, files are saved under their original names.
+
+### Language
+
+EN / RU / Traditional Chinese, resolved from `--lang`, then the saved config, then your `LANG` env, then English.
+
+```bash
+shm lang              # interactive picker (saved to config)
+shm lang ru
+shm --lang zh up file.txt
+```
+
+Config (servers, presets, language) lives at `~/.config/share-me/config.json` (`%APPDATA%\share-me\config.json` on Windows).
+
+> Plain `curl` can move the encrypted bytes — the REST API is curl-friendly — but it can't run the in-browser AES-256-GCM STREAM crypto. The CLI is what performs the end-to-end encryption.
 
 ## Configuration
 

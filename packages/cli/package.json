@@ -1,0 +1,58 @@
+{
+  "name": "@onokashino/share-me-cli",
+  "version": "0.0.0",
+  "description": "End-to-end-encrypted file & text sharing from the command line (share·me CLI).",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bin": {
+    "share-me": "dist/cli.cjs",
+    "shm": "dist/cli.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "share-me",
+    "encryption",
+    "end-to-end-encryption",
+    "e2ee",
+    "file-sharing",
+    "cli",
+    "aes-gcm",
+    "privacy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onokashino/share-me.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/onokashino/share-me/tree/master/packages/cli#readme",
+  "bugs": "https://github.com/onokashino/share-me/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist/cli.cjs --banner:js=\"#!/usr/bin/env node\"",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/cli.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@share-me/crypto": "*",
+    "@types/node": "^22.19.19",
+    "commander": "^14.0.0",
+    "esbuild": "^0.25.0",
+    "hash-wasm": "^4.12.0",
+    "jszip": "^3.10.1",
+    "picocolors": "^1.1.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
