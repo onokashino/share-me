@@ -1,11 +1,14 @@
-import { writeFile } from 'node:fs/promises';
+import { writeFile, rename, unlink } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { finished } from 'node:stream/promises';
 import { basename, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import {
-  decryptFile,
-  decodeBundle,
+  decryptFileStream,
+  decodeBundleStream,
+  type BundleStreamFile,
   deriveKeys,
   parseHeader,
   pbkdf2,
@@ -15,7 +18,7 @@ import {
   KdfType,
 } from '@share-me/crypto';
 import { deriveArgon2 } from '../crypto-node';
-import { getHeader, downloadBlob } from '../api';
+import { getHeader, downloadBlobStream } from '../api';
 import { parseLink } from '../link';
 import { orCancel } from '../ui';
 import { humanSize } from '../util';
@@ -28,10 +31,8 @@ export interface DownOpts {
   yes?: boolean;
 }
 
-interface Decoded {
-  kind: 'files' | 'text';
-  files: Array<{ name: string; type: string; bytes: Uint8Array }>;
-}
+/** Streams exactly one bundle file's bytes to the supplied sink. */
+type Pipe = (onChunk: (c: Uint8Array) => Promise<void> | void) => Promise<void>;
 
 export async function runDown(link: string, opts: DownOpts): Promise<void> {
   const L = t();
@@ -97,15 +98,24 @@ export async function runDown(link: string, opts: DownOpts): Promise<void> {
     const bearer = toBase64Url((await computeDownloadAuth(keys.authKey)).token);
 
     step(L.dnDownloading);
-    const ciphertext = await downloadBlob(server, id, bearer, randomUUID());
+    const ciphertextStream = await downloadBlobStream(server, id, bearer, randomUUID());
 
     step(L.dnDecrypting);
-    const { plaintext } = await decryptFile({ header, ciphertext, fragment, password, deriveArgon2 });
-    const decoded = decodeBundle(plaintext) as Decoded;
-    stopSpinner(L.dnDecrypted);
+    const { plaintextStream } = await decryptFileStream({ header, ciphertextStream, fragment, password, deriveArgon2 });
 
-    if (interactive) await outputInteractive(decoded);
-    else await outputDirect(decoded, opts);
+    // The header is authenticated at this point; stop the spinner before we
+    // stream the plaintext out (and possibly prompt for save targets).
+    stopSpinner(interactive ? L.dnDecrypted : undefined);
+
+    const { written, textNotSaved } = await deliver(plaintextStream, interactive, opts);
+
+    if (interactive) {
+      if (written.length) p.outro(pc.green(L.saved) + written.map((s) => pc.bold(s)).join(', '));
+      else if (textNotSaved) p.outro(pc.dim(L.dnShownNotSaved));
+      else p.outro(pc.green(L.done));
+    } else if (written.length) {
+      process.stderr.write(pc.green(`${L.saved}${written.join(', ')}`) + '\n');
+    }
   } catch (e) {
     const msg = (e as Error).message;
     if (interactive) p.cancel(pc.red(msg));
@@ -114,60 +124,126 @@ export async function runDown(link: string, opts: DownOpts): Promise<void> {
   }
 }
 
-async function outputInteractive(decoded: Decoded): Promise<void> {
-  const L = t();
-  if (decoded.kind === 'text') {
-    const f = decoded.files[0];
-    const text = new TextDecoder().decode(f.bytes);
-    p.note(text.length ? text : pc.dim('(empty)'), `${L.dnMessage} · ${humanSize(f.bytes.length)}`);
-
-    const save = orCancel(await p.confirm({ message: L.dnSaveQ, initialValue: false }));
-    if (!save) {
-      p.outro(pc.dim(L.dnShownNotSaved));
-      return;
+/** Decode the plaintext bundle stream and route each file to its destination. */
+async function deliver(
+  plaintextStream: ReadableStream<Uint8Array>,
+  interactive: boolean,
+  opts: DownOpts,
+): Promise<{ written: string[]; textNotSaved: boolean }> {
+  const written: string[] = [];
+  let textNotSaved = false;
+  await decodeBundleStream(plaintextStream, async (file, pipe) => {
+    if (file.kind === 'text') {
+      const bytes = await drain(pipe);
+      const saved = await deliverText(bytes, interactive, opts);
+      if (saved) written.push(saved);
+      else if (interactive) textNotSaved = true;
+    } else {
+      const saved = await deliverFile(file, pipe, interactive, opts);
+      if (saved) written.push(saved);
     }
-    const base = orCancel(
-      await p.text({ message: L.dnFileName, defaultValue: 'message', placeholder: 'message', validate: validateBaseName }),
-    );
-    const ext = orCancel(await p.text({ message: L.dnFormat, defaultValue: 'txt', placeholder: 'txt', validate: validateExt }));
-    const outPath = joinNameExt(base, ext);
-    await writeFile(outPath, f.bytes);
-    p.outro(pc.green(L.saved) + pc.bold(outPath));
-    return;
-  }
-
-  const saved: string[] = [];
-  for (const f of decoded.files) {
-    const ext = extname(f.name);
-    const defBase = basename(f.name, ext);
-    const input = orCancel(
-      await p.text({ message: L.dnSaveAs(f.name, ext), defaultValue: defBase, placeholder: defBase, validate: validateBaseName }),
-    );
-    const outPath = stripExt(input, ext) + ext;
-    await writeFile(outPath, f.bytes);
-    saved.push(outPath);
-  }
-  p.outro(pc.green(L.saved) + saved.map((s) => pc.bold(s)).join(', '));
+  });
+  return { written, textNotSaved };
 }
 
-async function outputDirect(decoded: Decoded, opts: DownOpts): Promise<void> {
+async function deliverText(bytes: Uint8Array, interactive: boolean, opts: DownOpts): Promise<string | null> {
   const L = t();
-  if (opts.out) {
-    await writeFile(opts.out, decoded.files[0].bytes);
-    process.stderr.write(pc.green(`${L.saved}${opts.out}`) + '\n');
-    return;
-  }
-  if (decoded.kind === 'text') {
-    const text = new TextDecoder().decode(decoded.files[0].bytes);
+  if (!interactive) {
+    if (opts.out) {
+      await writeFile(opts.out, bytes);
+      return opts.out;
+    }
+    const text = new TextDecoder().decode(bytes);
     process.stdout.write(text.endsWith('\n') ? text : text + '\n');
-    return;
+    return null;
   }
-  const saved: string[] = [];
-  for (const f of decoded.files) {
-    await writeFile(f.name, f.bytes);
-    saved.push(f.name);
+  const text = new TextDecoder().decode(bytes);
+  p.note(text.length ? text : pc.dim('(empty)'), `${L.dnMessage} · ${humanSize(bytes.length)}`);
+
+  const save = orCancel(await p.confirm({ message: L.dnSaveQ, initialValue: false }));
+  if (!save) return null;
+  const base = orCancel(
+    await p.text({ message: L.dnFileName, defaultValue: 'message', placeholder: 'message', validate: validateBaseName }),
+  );
+  const ext = orCancel(await p.text({ message: L.dnFormat, defaultValue: 'txt', placeholder: 'txt', validate: validateExt }));
+  const outPath = joinNameExt(base, ext);
+  await writeFile(outPath, bytes);
+  return outPath;
+}
+
+async function deliverFile(
+  file: BundleStreamFile,
+  pipe: Pipe,
+  interactive: boolean,
+  opts: DownOpts,
+): Promise<string | null> {
+  const L = t();
+  if (!interactive && opts.out) {
+    // --out names a single destination: the first file goes there, extras are
+    // drained so the stream stays aligned (matches the previous behaviour).
+    if (file.index === 0) {
+      await streamToFile(pipe, opts.out);
+      return opts.out;
+    }
+    await pipe(() => {});
+    return null;
   }
-  process.stderr.write(pc.green(`${L.saved}${saved.join(', ')}`) + '\n');
+
+  let target: string;
+  if (interactive) {
+    const ext = extname(file.name);
+    const defBase = basename(file.name, ext);
+    const input = orCancel(
+      await p.text({ message: L.dnSaveAs(file.name, ext), defaultValue: defBase, placeholder: defBase, validate: validateBaseName }),
+    );
+    target = stripExt(input, ext) + ext;
+  } else {
+    target = file.name;
+  }
+  await streamToFile(pipe, target);
+  return target;
+}
+
+/** Collect a (small) streamed file fully into memory, e.g. a shared text message. */
+async function drain(pipe: Pipe): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  await pipe((c) => {
+    chunks.push(c);
+  });
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.length;
+  }
+  return out;
+}
+
+/**
+ * Stream a file to disk via a temp file, renaming to `finalPath` only after the
+ * stream closes cleanly, so a truncated or tampered stream (which errors before
+ * the final segment) never leaves a half-written file under the real name.
+ */
+async function streamToFile(pipe: Pipe, finalPath: string): Promise<void> {
+  const tmp = `${finalPath}.shme-part-${randomUUID()}`;
+  const ws = createWriteStream(tmp);
+  try {
+    await pipe(
+      (c) =>
+        new Promise<void>((resolve, reject) => {
+          ws.write(c, (err) => (err ? reject(err) : resolve()));
+        }),
+    );
+    ws.end();
+    await finished(ws);
+    await rename(tmp, finalPath);
+  } catch (e) {
+    ws.destroy();
+    await unlink(tmp).catch(() => {});
+    throw e;
+  }
 }
 
 function validateBaseName(v: string): string | undefined {

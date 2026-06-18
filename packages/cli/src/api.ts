@@ -33,12 +33,21 @@ export async function createUpload(server: string, body: CreateBody): Promise<Cr
   return res.json() as Promise<CreateResp>;
 }
 
-export async function putBlob(server: string, id: string, uploadToken: string, ciphertext: Uint8Array): Promise<void> {
-  const res = await fetch(`${server}/api/v1/uploads/${id}/blob`, {
+export async function putBlobStream(
+  server: string,
+  id: string,
+  uploadToken: string,
+  body: ReadableStream<Uint8Array>,
+): Promise<void> {
+  // `duplex: 'half'` is required by Node/undici to send a streaming request
+  // body; it is not yet in the DOM RequestInit type, hence the intersection.
+  const init = {
     method: 'PUT',
     headers: { authorization: `Bearer ${uploadToken}`, 'content-type': 'application/octet-stream' },
-    body: new Blob([ciphertext as BlobPart]),
-  });
+    body,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' };
+  const res = await fetch(`${server}/api/v1/uploads/${id}/blob`, init);
   if (res.status !== 204) throw new Error(t().errHttp('blob upload', res.status));
 }
 
@@ -56,7 +65,12 @@ export async function getMeta(server: string, id: string): Promise<MetaResp> {
   return res.json() as Promise<MetaResp>;
 }
 
-export async function downloadBlob(server: string, id: string, bearer: string, sessionId: string): Promise<Uint8Array> {
+export async function downloadBlobStream(
+  server: string,
+  id: string,
+  bearer: string,
+  sessionId: string,
+): Promise<ReadableStream<Uint8Array>> {
   const res = await fetch(`${server}/api/v1/dl/${id}/blob`, {
     headers: { authorization: `Bearer ${bearer}`, 'x-download-session': sessionId },
   });
@@ -64,7 +78,8 @@ export async function downloadBlob(server: string, id: string, bearer: string, s
   if (res.status === 410) throw new Error(t().errGone);
   if (res.status === 423) throw new Error(t().errLocked);
   if (!res.ok) throw new Error(t().errHttp('download', res.status));
-  return new Uint8Array(await res.arrayBuffer());
+  if (!res.body) throw new Error(t().errHttp('download', res.status));
+  return res.body as ReadableStream<Uint8Array>;
 }
 
 export async function getStatus(server: string, id: string, ownerToken: string): Promise<unknown> {

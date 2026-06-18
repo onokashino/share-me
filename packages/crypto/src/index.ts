@@ -6,6 +6,8 @@ export { encodeHeader, parseHeader, verifyHeader, type HeaderFields, type Parsed
 export {
   encryptToBytes,
   decryptFromBytes,
+  encryptStream,
+  decryptStream,
   encryptSegment,
   decryptSegment,
   segmentCountFor,
@@ -13,14 +15,29 @@ export {
   segmentAad,
 } from './stream';
 export { computeDownloadAuth, type DownloadAuth } from './auth';
-export { encodeBundle, decodeBundle, type BundleEntry, type BundleManifest } from './bundle';
+export {
+  encodeBundle,
+  decodeBundle,
+  encodeBundleStream,
+  decodeBundleStream,
+  type BundleEntry,
+  type BundleManifest,
+  type BundleStreamEntry,
+  type BundleStreamFile,
+} from './bundle';
 export {
   encryptFile,
   decryptFile,
+  encryptFileStream,
+  decryptFileStream,
   type EncryptInput,
   type EncryptOutput,
+  type EncryptStreamInput,
+  type EncryptStreamOutput,
   type DecryptInput,
   type DecryptOutput,
+  type DecryptStreamInput,
+  type DecryptStreamOutput,
   type PasswordKdf,
   type DeriveArgon2Fn,
 } from './highlevel';

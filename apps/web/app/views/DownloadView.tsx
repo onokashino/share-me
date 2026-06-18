@@ -24,7 +24,14 @@ import { useToast } from '@/app/toast';
 import { Thumb } from '@/app/components/Thumb';
 import { PreviewLightbox } from '@/app/components/PreviewLightbox';
 import { FormattedText } from '@/app/components/FormattedText';
-import { openMeta, peekMeta, openDrop, newSession } from '@/app/lib/drop-service';
+import {
+  openMeta,
+  peekMeta,
+  openDrop,
+  newSession,
+  supportsFileSystemAccess,
+  saveDropToDisk,
+} from '@/app/lib/drop-service';
 import { fmtSize, fmtCountdown } from '@/app/lib/format';
 import { isPreviewable, saveFile } from '@/app/lib/preview';
 import { downloadZip } from '@/app/lib/zip';
@@ -48,7 +55,12 @@ interface ResultFile {
 
 type DropResult =
   | { kind: 'text'; files: ResultFile[]; text: string }
-  | { kind: 'files'; files: ResultFile[]; text?: undefined };
+  | { kind: 'files'; files: ResultFile[]; text?: undefined }
+  | { kind: 'saved'; names: string[]; files?: undefined; text?: undefined };
+
+// Above this ciphertext size, a files drop is streamed straight to disk via the
+// File System Access API (when supported) instead of decrypted into memory.
+const STREAM_TO_DISK_THRESHOLD = 256 * 1024 * 1024;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -169,6 +181,24 @@ export function DownloadView({ id, rawKey, onSend }: DownloadViewProps) {
     const sessionId = (sessionRef.current ??= newSession());
 
     try {
+      // Large files drop on a capable browser: stream straight to a chosen
+      // directory instead of decrypting the whole payload into memory.
+      if (meta && meta.size_cipher > STREAM_TO_DISK_THRESHOLD && supportsFileSystemAccess()) {
+        const saved = await saveDropToDisk({
+          id,
+          fragment,
+          password: meta.has_password ? pw : undefined,
+          sessionId,
+          onProgress: setDprog,
+        });
+        if ('needsPassword' in saved) {
+          setPwErr(L.pwErrNeed);
+          return;
+        }
+        setResult({ kind: 'saved', names: saved.names });
+        return;
+      }
+
       const r = await openDrop({
         id,
         fragment,
@@ -197,7 +227,9 @@ export function DownloadView({ id, rawKey, onSend }: DownloadViewProps) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
 
-      if (msg === 'unauthorized') {
+      if (msg === 'picker-cancelled') {
+        // user dismissed the directory picker — leave the gate as-is
+      } else if (msg === 'unauthorized') {
         if (meta?.has_password) {
           setPwErr(L.pwErrBad);
         } else {
@@ -326,6 +358,49 @@ export function DownloadView({ id, rawKey, onSend }: DownloadViewProps) {
                 </button>
               </div>
               <FormattedText text={result.text} />
+            </div>
+            <div className="trust">
+              <Icons.shield filled sw={0} />
+              <div>
+                <b>{L.doneTitle}</b>
+                {L.doneDesc}
+              </div>
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <button className="btn btn-ghost btn-block" onClick={onSend}>
+                <Icons.upload /> {L.sendYourFile}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Saved-to-disk result (streamed directly to a chosen folder)
+    if (result.kind === 'saved') {
+      return (
+        <div className="card fade-in">
+          <div className="ready">
+            <div className="ready-head">
+              <div className="ready-badge">
+                <Icons.shield filled sw={0} />
+              </div>
+              <div>
+                <h2>{L.decryptedTitle}</h2>
+                <p>{L.decryptedDescNo}</p>
+              </div>
+            </div>
+            <div className="file-list" style={{ padding: '0 0 4px' }}>
+              {result.names.map((n, i) => (
+                <div className="file-row" key={i}>
+                  <div className="file-info">
+                    <div className="file-name">{n}</div>
+                  </div>
+                  <span className="copy-btn">
+                    <Icons.check sw={3} />
+                  </span>
+                </div>
+              ))}
             </div>
             <div className="trust">
               <Icons.shield filled sw={0} />

@@ -102,3 +102,106 @@ export async function decryptFromBytes(
   return concatParts(out);
 }
 
+/**
+ * A FIFO byte buffer that hands out exact-length slices without re-copying the
+ * whole backlog on every push (segment re-chunking would otherwise be O(n^2)).
+ */
+function byteQueue() {
+  const chunks: Uint8Array[] = [];
+  let len = 0;
+  return {
+    get length() {
+      return len;
+    },
+    push(c: Uint8Array): void {
+      if (c.length > 0) {
+        chunks.push(c);
+        len += c.length;
+      }
+    },
+    take(n: number): Uint8Array {
+      const out = new Uint8Array(n);
+      let off = 0;
+      while (off < n) {
+        const head = chunks[0];
+        if (head === undefined) throw new Error('byteQueue underflow');
+        const need = n - off;
+        if (head.length <= need) {
+          out.set(head, off);
+          off += head.length;
+          chunks.shift();
+        } else {
+          out.set(head.subarray(0, need), off);
+          chunks[0] = head.subarray(need);
+          off += need;
+        }
+      }
+      len -= n;
+      return out;
+    },
+  };
+}
+
+/**
+ * Streaming counterpart of {@link encryptToBytes}: re-chunks an arbitrary
+ * plaintext byte stream into fixed `segmentSize` segments and emits one
+ * ciphertext segment each. Output is byte-identical to encryptToBytes for the
+ * same input, so streamed and buffered uploads are wire-compatible. The
+ * trailing (or only) segment is flushed with isFinal=true.
+ */
+export function encryptStream(
+  contentKey: CryptoKey,
+  noncePrefix: Uint8Array,
+  segmentSize: number,
+): TransformStream<Uint8Array, Uint8Array> {
+  const q = byteQueue();
+  let counter = 0;
+  return new TransformStream<Uint8Array, Uint8Array>({
+    async transform(chunk, ctrl) {
+      q.push(chunk);
+      while (q.length > segmentSize) {
+        ctrl.enqueue(await encryptSegment(contentKey, noncePrefix, counter, false, q.take(segmentSize)));
+        counter++;
+      }
+    },
+    async flush(ctrl) {
+      ctrl.enqueue(await encryptSegment(contentKey, noncePrefix, counter, true, q.take(q.length)));
+    },
+  });
+}
+
+/**
+ * Streaming counterpart of {@link decryptFromBytes}, mirroring encryptStream's
+ * segmentation: a full ciphertext segment is `segmentSize + TAG_LEN` bytes and
+ * is non-final while strictly more than one remains; the trailing segment is
+ * final. Each segment is GCM-verified, and a truncated or reordered stream is
+ * rejected because the counter and final flag are bound into the AAD/nonce.
+ *
+ * Note: plaintext segments are released as they authenticate, before the final
+ * segment is seen. Truncation is still detected (the stream errors instead of
+ * ending cleanly), but a consumer writing to disk must treat output as
+ * provisional until the stream closes without error.
+ */
+export function decryptStream(
+  contentKey: CryptoKey,
+  noncePrefix: Uint8Array,
+  segmentSize: number,
+): TransformStream<Uint8Array, Uint8Array> {
+  const ctSegLen = segmentSize + TAG_LEN;
+  const q = byteQueue();
+  let counter = 0;
+  return new TransformStream<Uint8Array, Uint8Array>({
+    async transform(chunk, ctrl) {
+      q.push(chunk);
+      while (q.length > ctSegLen) {
+        ctrl.enqueue(await decryptSegment(contentKey, noncePrefix, counter, false, q.take(ctSegLen)));
+        counter++;
+      }
+    },
+    async flush(ctrl) {
+      if (q.length < TAG_LEN) throw new Error('ciphertext too short');
+      ctrl.enqueue(await decryptSegment(contentKey, noncePrefix, counter, true, q.take(q.length)));
+    },
+  });
+}
+
