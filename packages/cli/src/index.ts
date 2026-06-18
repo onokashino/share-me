@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
@@ -17,12 +19,20 @@ async function applyLanguage(flagLang?: string): Promise<void> {
   setLanguage(normalizeLang(flagLang) ?? cfg.lang ?? normalizeLang(env) ?? 'en');
 }
 
+const CLI_VERSION = ((): string => {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version as string;
+  } catch {
+    return '0.0.0';
+  }
+})();
+
 const program = new Command();
 
 program
   .name('share-me')
   .description('End-to-end-encrypted file & text sharing, from the console')
-  .version('0.0.0')
+  .version(CLI_VERSION)
   .option('--lang <code>', 'interface language: en | ru | zh')
   .hook('preAction', async () => {
     await applyLanguage(program.opts().lang as string | undefined);
