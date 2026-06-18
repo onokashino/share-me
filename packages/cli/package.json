@@ -44,7 +44,7 @@
     "@share-me/crypto": "*",
     "@types/node": "^22.19.19",
     "commander": "^14.0.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "hash-wasm": "^4.12.0",
     "jszip": "^3.10.1",
     "picocolors": "^1.1.1",
