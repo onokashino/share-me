@@ -11,15 +11,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
+    "@base-ui/react": "^1.6.0",
     "@share-me/crypto": "*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "driver.js": "^1.4.0",
     "hash-wasm": "^4.12.0",
     "jszip": "^3.10.1",
-    "lucide-react": "^1.17.0",
-    "next": "16.2.7",
+    "lucide-react": "^1.21.0",
+    "next": "16.2.9",
     "qrcode-generator": "^2.0.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -30,14 +30,14 @@
   "devDependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20.19.42",
+    "@tailwindcss/postcss": "^4.3.1",
+    "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.7",
+    "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }
